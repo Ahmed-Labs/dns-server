@@ -37,37 +37,27 @@ func (h Header) encode() [12]byte {
 	offset += 2
 
 	if h.QR {
-		data[offset] = 1
+		data[offset] |= 1 << 7
 	}
-	offset += 1
-
-	data[offset] = h.OPCode
-	offset += 1
+	data[offset] |= (h.OPCode & 0b1111) << 3
 
 	if h.Authoitative {
-		data[offset] = 1
+		data[offset] |= 1 << 2
 	}
-	offset += 1
-
 	if h.Truncation {
-		data[offset] = 1
+		data[offset] |= 1 << 1
 	}
-	offset += 1
-
 	if h.RecursionDesired {
-		data[offset] = 1
+		data[offset] |= 1
 	}
-	offset += 1
 
+	offset += 1
 	if h.RecursionAvailable {
-		data[offset] = 1
+		data[offset] |= 1 << 7
 	}
-	offset += 1
+	data[offset] |= (h.Reserved & 0b111) << 4
 
-	data[offset] = h.Reserved
-	offset += 1
-
-	data[offset] = h.RCODE
+	data[offset] |= h.RCODE & 0b1111
 	offset += 1
 
 	binary.BigEndian.PutUint16(data[offset:], h.QDCount)
