@@ -24,7 +24,7 @@ type Header struct {
 	ID                 uint16
 	QR                 bool
 	OPCode             uint8
-	Authoitative       bool
+	Authoritative      bool
 	Truncation         bool
 	RecursionDesired   bool
 	RecursionAvailable bool
@@ -48,7 +48,7 @@ func (h Header) serialize() [12]byte {
 	}
 	data[offset] |= (h.OPCode & 0b1111) << 3
 
-	if h.Authoitative {
+	if h.Authoritative {
 		data[offset] |= 1 << 2
 	}
 	if h.Truncation {

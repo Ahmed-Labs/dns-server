@@ -37,7 +37,7 @@ func main() {
 				ID:                 1234,
 				QR:                 true,
 				OPCode:             0,
-				Authoitative:       false,
+				Authoritative:      false,
 				Truncation:         false,
 				RecursionDesired:   false,
 				RecursionAvailable: false,
