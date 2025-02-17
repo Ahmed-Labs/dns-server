@@ -6,35 +6,37 @@ import (
 )
 
 type Message struct {
-	Header Header
+	Header   Header
 	Question Question
+	Answer   Answer
 }
 
-func (m Message) encode() []byte {
+func (m Message) serialize() []byte {
 	data := []byte{}
-	header := m.Header.encode()
+	header := m.Header.serialize()
 	data = append(data, header[:]...)
-	data = append(data, m.Question.encode()...)
+	data = append(data, m.Question.serialize()...)
+	data = append(data, m.Answer.serialize()...)
 	return data
 }
 
 type Header struct {
-	ID uint16
-	QR bool
-	OPCode uint8
-	Authoitative bool
-	Truncation bool
-	RecursionDesired bool
+	ID                 uint16
+	QR                 bool
+	OPCode             uint8
+	Authoitative       bool
+	Truncation         bool
+	RecursionDesired   bool
 	RecursionAvailable bool
-	Reserved uint8
-	RCODE uint8
-	QDCount uint16
-	ANCount uint16
-	NSCount uint16
-	ARCount uint16
+	Reserved           uint8
+	RCODE              uint8
+	QDCount            uint16
+	ANCount            uint16
+	NSCount            uint16
+	ARCount            uint16
 }
 
-func (h Header) encode() [12]byte {
+func (h Header) serialize() [12]byte {
 	data := [12]byte{}
 	offset := 0
 
@@ -80,31 +82,51 @@ func (h Header) encode() [12]byte {
 }
 
 type Question struct {
-	Name string
-	Type QuestionType
+	Name  string
+	Type  QuestionType
 	Class QuestionClass
 }
 
-func (q Question) encode() []byte {
-	data := encodeDomainName(q.Name)
+func (q Question) serialize() []byte {
+	data := labelSequence(q.Name)
 	data = binary.BigEndian.AppendUint16(data, uint16(q.Type))
 	data = binary.BigEndian.AppendUint16(data, uint16(q.Class))
 	return data
 }
 
-func encodeDomainName(name string) []byte {
+// creates a label sequence from a domain name
+func labelSequence(name string) []byte {
 	labels := strings.Split(name, ".")
 	totalSize := len(name) + len(labels)
 	data := make([]byte, totalSize)
 
-    idx := 0
-    for _, label := range labels {
-        data[idx] = byte(len(label))
-        idx++
-        copy(data[idx:], label)
-        idx += len(label)
-    }
+	idx := 0
+	for _, label := range labels {
+		data[idx] = byte(len(label))
+		idx++
+		copy(data[idx:], label)
+		idx += len(label)
+	}
 
-    data[idx] = 0x00
+	data[idx] = 0x00
+	return data
+}
+
+type Answer struct {
+	Name   string
+	Type   QuestionType
+	Class  QuestionClass
+	TTL    uint32
+	Length uint16
+	Data   []byte
+}
+
+func (a Answer) serialize() []byte {
+	data := labelSequence(a.Name)
+	data = binary.BigEndian.AppendUint16(data, uint16(a.Type))
+	data = binary.BigEndian.AppendUint16(data, uint16(a.Class))
+	data = binary.BigEndian.AppendUint32(data, a.TTL)
+	data = binary.BigEndian.AppendUint16(data, a.Length)
+	data = append(data, a.Data...)
 	return data
 }
