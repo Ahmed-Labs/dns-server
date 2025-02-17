@@ -1,16 +1,21 @@
 package main
 
-import "encoding/binary"
-
+import (
+	"encoding/binary"
+	"strings"
+)
 
 type Message struct {
 	Header Header
-
+	Question Question
 }
 
 func (m Message) encode() []byte {
+	data := []byte{}
 	header := m.Header.encode()
-	return header[:]
+	data = append(data, header[:]...)
+	data = append(data, m.Question.encode()...)
+	return data
 }
 
 type Header struct {
@@ -71,5 +76,35 @@ func (h Header) encode() [12]byte {
 
 	binary.BigEndian.PutUint16(data[offset:], h.ARCount)
 
+	return data
+}
+
+type Question struct {
+	Name string
+	Type QuestionType
+	Class QuestionClass
+}
+
+func (q Question) encode() []byte {
+	data := encodeDomainName(q.Name)
+	data = binary.BigEndian.AppendUint16(data, uint16(q.Type))
+	data = binary.BigEndian.AppendUint16(data, uint16(q.Class))
+	return data
+}
+
+func encodeDomainName(name string) []byte {
+	labels := strings.Split(name, ".")
+	totalSize := len(name) + len(labels)
+	data := make([]byte, totalSize)
+
+    idx := 0
+    for _, label := range labels {
+        data[idx] = byte(len(label))
+        idx++
+        copy(data[idx:], label)
+        idx += len(label)
+    }
+
+    data[idx] = 0x00
 	return data
 }

@@ -33,6 +33,11 @@ func main() {
 	
 		// Create an empty response
 		response := Message{
+			Question: Question{
+				Name: "codecrafters.io",
+				Type: QTYPE_A,
+				Class: QCLASS_IN,
+			},
 			Header: Header{
 				ID: 1234,
 				QR: true,
@@ -43,7 +48,7 @@ func main() {
 				RecursionAvailable: false,
 				Reserved: 0,
 				RCODE: 0,
-				QDCount: 0,
+				QDCount: 1,
 				ANCount: 0,
 				NSCount: 0,
 				ARCount: 0,
