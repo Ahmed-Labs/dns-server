@@ -1,23 +1,66 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
-	"strings"
+	"fmt"
 )
 
 type Message struct {
-	Header   Header
-	Question Question
-	Answer   Answer
+	Header   *Header
+	Questions []Question
+	Answers   []Answer
+}
+
+func NewMessage() *Message {
+	return &Message{
+		Header: &Header{},
+	}
+}
+
+func (m *Message) WithHeader(h Header) *Message {
+	m.Header = &h
+	return m
 }
 
 func (m Message) serialize() []byte {
-	data := []byte{}
-	header := m.Header.serialize()
+	var header [12]byte
+	var question, answer []byte
+	size := 0
+
+	if m.Header != nil {
+		header = m.Header.serialize()
+		size += 12
+	}
+	if m.Questions != nil {
+		for _, q := range m.Questions {
+			question = append(question, q.serialize()...)
+		}
+		size += len(question)
+	}
+	if m.Answers != nil {
+		for _, a := range m.Answers {
+			answer = append(answer, a.serialize()...)
+		}
+		size += len(answer)
+	}
+
+	data := make([]byte, 0, size)
 	data = append(data, header[:]...)
-	data = append(data, m.Question.serialize()...)
-	data = append(data, m.Answer.serialize()...)
+	data = append(data, question...)
+	data = append(data, answer...)
+	
 	return data
+}
+
+func (m *Message) deserialize(b []byte) error {
+	reader := bytes.NewReader(b)
+
+	err := m.Header.deserialize(reader)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 type Header struct {
@@ -81,6 +124,54 @@ func (h Header) serialize() [12]byte {
 	return data
 }
 
+func (h *Header) deserialize(reader *bytes.Reader) error {
+	err := binary.Read(reader, binary.BigEndian, &h.ID)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(reader)
+	fmt.Println("ID", h.ID)
+
+	var b byte
+	err = binary.Read(reader, binary.BigEndian, &b)
+	if err != nil {
+		return err
+	}
+	h.QR = (b & (1 << 7)) != 0
+	h.OPCode = (b >> 3) & 0b1111
+	h.Authoritative = (b & (1 << 2)) != 0
+	h.Truncation = (b & (1 << 1)) != 0
+	h.RecursionDesired = (b & 1) != 0
+
+	err = binary.Read(reader, binary.BigEndian, &b)
+	if err != nil {
+		return err
+	}
+	h.RecursionAvailable = (b & (1 << 7)) != 0
+	h.Reserved = (b >> 4) & 0b111
+	h.RCODE = b & 0b1111
+
+	err = binary.Read(reader, binary.BigEndian, &h.QDCount)
+	if err != nil {
+		return err
+	}
+	err = binary.Read(reader, binary.BigEndian, &h.ANCount)
+	if err != nil {
+		return err
+	}
+	err = binary.Read(reader, binary.BigEndian, &h.NSCount)
+	if err != nil {
+		return err
+	}
+	err = binary.Read(reader, binary.BigEndian, &h.ARCount)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 type Question struct {
 	Name  string
 	Type  QuestionType
@@ -88,30 +179,11 @@ type Question struct {
 }
 
 func (q Question) serialize() []byte {
-	data := labelSequence(q.Name)
+	data := DomainToLabels(q.Name)
 	data = binary.BigEndian.AppendUint16(data, uint16(q.Type))
 	data = binary.BigEndian.AppendUint16(data, uint16(q.Class))
 	return data
 }
-
-// creates a label sequence from a domain name
-func labelSequence(name string) []byte {
-	labels := strings.Split(name, ".")
-	totalSize := len(name) + len(labels)
-	data := make([]byte, totalSize)
-
-	idx := 0
-	for _, label := range labels {
-		data[idx] = byte(len(label))
-		idx++
-		copy(data[idx:], label)
-		idx += len(label)
-	}
-
-	data[idx] = 0x00
-	return data
-}
-
 type Answer struct {
 	Name   string
 	Type   QuestionType
@@ -122,11 +194,14 @@ type Answer struct {
 }
 
 func (a Answer) serialize() []byte {
-	data := labelSequence(a.Name)
+	data := DomainToLabels(a.Name)
 	data = binary.BigEndian.AppendUint16(data, uint16(a.Type))
 	data = binary.BigEndian.AppendUint16(data, uint16(a.Class))
 	data = binary.BigEndian.AppendUint32(data, a.TTL)
 	data = binary.BigEndian.AppendUint16(data, a.Length)
-	data = append(data, a.Data...)
+
+	if a.Data != nil {
+		data = append(data, a.Data...)
+	}
 	return data
 }

@@ -25,45 +25,21 @@ func main() {
 		size, source, err := udpConn.ReadFromUDP(buf)
 		if err != nil {
 			fmt.Println("Error receiving data:", err)
-			break
+			continue
 		}
 
 		receivedData := string(buf[:size])
 		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
 
-		// Create an empty response
-		response := Message{
-			Header: Header{
-				ID:                 1234,
-				QR:                 true,
-				OPCode:             0,
-				Authoritative:      false,
-				Truncation:         false,
-				RecursionDesired:   false,
-				RecursionAvailable: false,
-				Reserved:           0,
-				RCODE:              0,
-				QDCount:            1,
-				ANCount:            1,
-				NSCount:            0,
-				ARCount:            0,
-			},
-			Question: Question{
-				Name:  "codecrafters.io",
-				Type:  QTYPE_A,
-				Class: QCLASS_IN,
-			},
-			Answer: Answer{
-				Name:   "codecrafters.io",
-				Type:   QTYPE_A,
-				Class:  QCLASS_IN,
-				TTL:    60,
-				Length: 4,
-				Data:   []byte{8, 8, 8, 8},
-			},
-		}.serialize()
+		query := NewMessage()
+		err = query.deserialize(buf[:size])
+		if err != nil {
+			fmt.Println("Failed to deserialize dns message:", err)
+			continue
+		}
 
-		_, err = udpConn.WriteToUDP(response, source)
+		response := NewResponse(query)
+		_, err = udpConn.WriteToUDP(response.serialize(), source)
 		if err != nil {
 			fmt.Println("Failed to send response:", err)
 		}
