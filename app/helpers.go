@@ -22,3 +22,22 @@ func DomainToLabels(name string) []byte {
 	data[idx] = 0x00
 	return data
 }
+
+func LabelsToDomain(labels []byte) string {
+	var sb strings.Builder
+	idx := 0
+
+	for idx < len(labels) && labels[idx] != 0x00 {
+		length := int(labels[idx])
+		label := string(labels[idx+1 : idx+1+length])
+
+		sb.WriteString(label)
+
+		idx += length + 1
+		if idx < len(labels) && labels[idx] != 0x00 {
+			sb.WriteByte('.')
+		}
+	}
+
+	return sb.String()
+}

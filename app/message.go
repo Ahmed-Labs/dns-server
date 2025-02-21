@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 )
 
 type Message struct {
@@ -60,6 +59,16 @@ func (m *Message) deserialize(b []byte) error {
 	if err != nil {
 		return err
 	}
+
+	for range m.Header.QDCount {
+		question := Question{}
+		err = question.deserialize(reader)
+		if err != nil {
+			return err
+		}
+		m.Questions = append(m.Questions, question)
+	}
+
 	return nil
 }
 
@@ -130,9 +139,6 @@ func (h *Header) deserialize(reader *bytes.Reader) error {
 		return err
 	}
 
-	fmt.Println(reader)
-	fmt.Println("ID", h.ID)
-
 	var b byte
 	err = binary.Read(reader, binary.BigEndian, &b)
 	if err != nil {
@@ -183,6 +189,33 @@ func (q Question) serialize() []byte {
 	data = binary.BigEndian.AppendUint16(data, uint16(q.Type))
 	data = binary.BigEndian.AppendUint16(data, uint16(q.Class))
 	return data
+}
+
+func (q *Question) deserialize(reader *bytes.Reader) error {
+	labels := []byte{}
+	
+	for {
+		b, err := reader.ReadByte();
+		if err != nil {
+			return err
+		}
+		labels = append(labels, b)
+		if b == 0x00 {
+			break
+		}
+	}
+
+	q.Name = LabelsToDomain(labels)
+
+	err := binary.Read(reader, binary.BigEndian, &q.Type)
+	if err != nil {
+		return err
+	}
+	err = binary.Read(reader, binary.BigEndian, &q.Class)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 type Answer struct {
 	Name   string

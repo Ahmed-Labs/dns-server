@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 )
@@ -28,20 +29,33 @@ func main() {
 			continue
 		}
 
-		receivedData := string(buf[:size])
-		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
-
 		query := NewMessage()
-		err = query.deserialize(buf[:size])
+		receivedData := buf[:size]
+
+		err = query.deserialize(receivedData)
 		if err != nil {
 			fmt.Println("Failed to deserialize dns message:", err)
 			continue
 		}
+		fmt.Println("QUERY")
+		PrintMessage(query)
 
 		response := NewResponse(query)
+
+		fmt.Println("RESPONSE")
+		PrintMessage(response)
 		_, err = udpConn.WriteToUDP(response.serialize(), source)
 		if err != nil {
 			fmt.Println("Failed to send response:", err)
 		}
 	}
+}
+
+func PrintMessage(msg *Message) {
+	data, err := json.MarshalIndent(msg, "", "  ")
+	if err != nil {
+		fmt.Println("Error printing message:", err)
+		return
+	}
+	fmt.Println(string(data))
 }
