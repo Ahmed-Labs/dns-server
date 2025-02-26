@@ -6,7 +6,7 @@ import (
 )
 
 type Message struct {
-	Header   *Header
+	Header    *Header
 	Questions []Question
 	Answers   []Answer
 }
@@ -48,7 +48,7 @@ func (m Message) serialize() []byte {
 	data = append(data, header[:]...)
 	data = append(data, question...)
 	data = append(data, answer...)
-	
+
 	return data
 }
 
@@ -60,9 +60,12 @@ func (m *Message) deserialize(b []byte) error {
 		return err
 	}
 
+	// maps indices of domain names in case of reuse
+	domainNameCompression := map[int]string{}
+
 	for range m.Header.QDCount {
 		question := Question{}
-		err = question.deserialize(reader)
+		err = question.deserialize(reader, domainNameCompression)
 		if err != nil {
 			return err
 		}
@@ -191,23 +194,33 @@ func (q Question) serialize() []byte {
 	return data
 }
 
-func (q *Question) deserialize(reader *bytes.Reader) error {
+func (q *Question) deserialize(reader *bytes.Reader, compressionMap map[int]string) error {
 	labels := []byte{}
-	
+	currentIdx, err := reader.Seek(0, 1)
+	if err != nil {
+		return err
+	}
 	for {
-		b, err := reader.ReadByte();
+		b, err := reader.ReadByte()
 		if err != nil {
 			return err
 		}
 		labels = append(labels, b)
 		if b == 0x00 {
 			break
+		} 
+		if b >> 6 == 0b11 {
+			b, err := reader.ReadByte()
+			if err != nil {
+				return err
+			}
+			labels = append(labels, b)
+			break
 		}
 	}
+	q.Name = LabelsToDomain(labels, compressionMap, int(currentIdx))
 
-	q.Name = LabelsToDomain(labels)
-
-	err := binary.Read(reader, binary.BigEndian, &q.Type)
+	err = binary.Read(reader, binary.BigEndian, &q.Type)
 	if err != nil {
 		return err
 	}
@@ -217,6 +230,7 @@ func (q *Question) deserialize(reader *bytes.Reader) error {
 	}
 	return nil
 }
+
 type Answer struct {
 	Name   string
 	Type   QuestionType
